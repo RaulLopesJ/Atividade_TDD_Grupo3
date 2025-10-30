@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Equipe 3 - Controle de Empréstimos</title>
+    
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f9;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .main-container {
+            display: flex;
+            gap: 20px;
+            width: 100%;
+            max-width: 1200px;
+        }
+
+        .dashboard, .actions {
+            background: #fff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .actions {
+            flex: 1; /* Ocupa 1/3 */
+        }
+        
+        .dashboard {
+            flex: 2; /* Ocupa 2/3 */
+            min-height: 400px;
+        }
+
+        h1 {
+            margin-top: 0;
+            margin-bottom: 20px;
+            color: #333;
+            font-size: 22px;
+            text-align: center;
+        }
+        
+        h2 {
+            font-size: 18px;
+            color: #444;
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 5px;
+            margin-top: 25px;
+        }
+
+        label {
+            display: block;
+            text-align: left;
+            margin-top: 10px;
+            font-weight: bold;
+            color: #555;
+            font-size: 14px;
+        }
+
+        input[type="number"], input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            margin-top: 5px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            box-sizing: border-box; /* Garante que o padding não estoure a largura */
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 15px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        
+        #responseArea {
+            margin-top: 15px;
+            font-size: 14px;
+            padding: 10px;
+            border-radius: 6px;
+            display: none; /* Começa escondido */
+        }
+        #responseArea.success {
+            background: #e6f7ec;
+            color: #006421;
+            display: block;
+        }
+        #responseArea.error {
+            background: #fdecea;
+            color: #a80000;
+            display: block;
+        }
+        
+        /* Estilo da Tabela de Empréstimos */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+            font-size: 14px;
+        }
+        th {
+            background-color: #f9f9f9;
+            color: #333;
+        }
+        tr:nth-child(even) {
+            background-color: #fdfdfd;
+        }
+        .status-ACTIVE {
+            color: #007bff;
+            font-weight: bold;
+        }
+        .status-RETURNED {
+            color: #28a745;
+            font-weight: bold;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="main-container">
+        
+        <div class="actions">
+            <h1>Ações da Biblioteca</h1>
+
+            <form id="formEmprestimo">
+                <h2>Registrar Empréstimo</h2>
+                <label for="emp-userId">ID do Usuário:</label>
+                <input type="number" id="emp-userId" required>
+                
+                <label for="emp-bookId">ID do Livro:</label>
+                <input type="number" id="emp-bookId" required>
+                
+                <button type="submit">Registrar Empréstimo</button>
+            </form>
+
+            <form id="formDevolucao">
+                <h2>Registrar Devolução</h2>
+                <label for="dev-loanId">ID do Empréstimo:</label>
+                <input type="number" id="dev-loanId" required>
+                
+                <button type="submit">Registrar Devolução</button>
+            </form>
+            
+            <form id="formVerificar">
+                <h2>Verificar Disponibilidade</h2>
+                <label for="ver-bookId">ID do Livro:</label>
+                <input type="number" id="ver-bookId" required>
+                
+                <button type="submit">Verificar</button>
+            </form>
+
+            <div id="responseArea"></div>
+        </div>
+        
+        <div class="dashboard">
+            <h1>Dashboard de Empréstimos</h1>
+            <table id="emprestimosTable">
+                <thead>
+                    <tr>
+                        <th>LoanID</th>
+                        <th>UserID</th>
+                        <th>BookID</th>
+                        <th>Status</th>
+                        <th>Data Empréstimo</th>
+                        <th>Data Devolução</th>
+                    </tr>
+                </thead>
+                <tbody id="emprestimosBody">
+                    </tbody>
+            </table>
+        </div>
+
+    </div>
+
+    <script>
+        // Pega os elementos do DOM
+        const formEmprestimo = document.getElementById('formEmprestimo');
+        const formDevolucao = document.getElementById('formDevolucao');
+        const formVerificar = document.getElementById('formVerificar');
+        const responseArea = document.getElementById('responseArea');
+        const emprestimosBody = document.getElementById('emprestimosBody');
+
+        // Função para mostrar resultados na tela
+        function showResponse(message, isError = false) {
+            responseArea.textContent = message;
+            responseArea.className = isError ? 'error' : 'success';
+        }
+
+        // Função para carregar e recarregar a tabela de empréstimos
+        async function loadEmprestimos() {
+            try {
+                const response = await fetch('/api/emprestimos');
+                const emprestimos = await response.json();
+                
+                emprestimosBody.innerHTML = ''; // Limpa a tabela
+                
+                if (emprestimos.length === 0) {
+                    emprestimosBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Nenhum empréstimo registrado.</td></tr>';
+                    return;
+                }
+
+                emprestimos.forEach(loan => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${loan.loanId}</td>
+                        <td>${loan.userId}</td>
+                        <td>${loan.bookId}</td>
+                        <td><span class="status-${loan.status}">${loan.status}</span></td>
+                        <td>${new Date(loan.loanDate).toLocaleString('pt-BR')}</td>
+                        <td>${loan.dueDate ? new Date(loan.dueDate).toLocaleDateString('pt-BR') : 'N/A'}</td>
+                    `;
+                    emprestimosBody.appendChild(tr);
+                });
+            } catch (err) {
+                console.error('Erro ao carregar empréstimos:', err);
+                emprestimosBody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:red;">Erro ao carregar dados.</td></tr>';
+            }
+        }
+
+        // Event Listener: Registrar Empréstimo
+        formEmprestimo.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const userId = document.getElementById('emp-userId').value;
+            const bookId = document.getElementById('emp-bookId').value;
+
+            const response = await fetch('/api/registrar_emprestimo', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: userId, bookId: bookId })
+            });
+            
+            const result = await response.json();
+            
+            if (result.sucesso) {
+                showResponse(`Empréstimo ${result.loan.loanId} registrado com sucesso!`);
+                formEmprestimo.reset();
+                loadEmprestimos(); // Recarrega a tabela
+            } else {
+                showResponse(`Erro: ${result.erro}`, true);
+            }
+        });
+        
+        // Event Listener: Registrar Devolução
+        formDevolucao.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const loanId = document.getElementById('dev-loanId').value;
+            
+            const response = await fetch('/api/registrar_devolucao', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ loanId: loanId })
+            });
+            
+            const result = await response.json();
+            
+            if (result.sucesso) {
+                showResponse(`Devolução do empréstimo ${result.loan.loanId} registrada!`);
+                formDevolucao.reset();
+                loadEmprestimos(); // Recarrega a tabela
+            } else {
+                showResponse(`Erro: ${result.erro}`, true);
+            }
+        });
+
+        // Event Listener: Verificar Disponibilidade
+        formVerificar.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const bookId = document.getElementById('ver-bookId').value;
+            
+            const response = await fetch(`/api/verificar_livro/${bookId}`);
+            const result = await response.json();
+            
+            if (result.erro) {
+                showResponse(`Erro: ${result.erro}`, true);
+            } else {
+                showResponse(`Livro: ${result.titulo} | Status: ${result.status.toUpperCase()}`);
+            }
+            formVerificar.reset();
+        });
+
+        // Carrega os empréstimos ao iniciar a página
+        document.addEventListener('DOMContentLoaded', loadEmprestimos);
+
+    </script>
+</body>
+</html>
