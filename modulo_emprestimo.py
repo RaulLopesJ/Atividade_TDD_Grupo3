@@ -1,142 +1,147 @@
 # modulo_emprestimo.py
-import json
-import os
 from datetime import datetime, timedelta
-
-# Importa os MÓDULOS das outras equipes (neste caso, nossos mocks)
 import mock_usuarios
 import mock_catalogo
 
-# Define o arquivo que servirá como nosso banco de dados
-DB_FILE = 'emprestimos.json'
+class Emprestimo:
+    def __init__(self, user_id, book_id, loan_id, loan_date, due_date, status="ACTIVE", return_date=None, fine=0.0):
+        self._user_id = user_id
+        self._book_id = book_id
+        self._loan_id = loan_id
+        self._loan_date = loan_date
+        self._due_date = due_date
+        self._return_date = return_date
+        self._status = status
+        self._fine = fine
 
-# --- Funções de Persistência de Dados (Base) ---
+    def get_loan_id(self):
+        return self._loan_id
 
-def _load_db():
-    """Carrega os dados do nosso "banco de dados" JSON."""
-    if not os.path.exists(DB_FILE):
-        return []
-    try:
-        with open(DB_FILE, 'r') as f:
-            return json.load(f)
-    except json.JSONDecodeError:
-        return []
+    def get_user_id(self):
+        return self._user_id
 
-def _save_db(data):
-    """Salva os dados no nosso "banco de dados" JSON."""
-    with open(DB_FILE, 'w') as f:
-        json.dump(data, f, indent=2)
+    def get_book_id(self):
+        return self._book_id
 
-def _get_next_loan_id():
-    """Gera um novo ID auto-incrementado"""
-    db = _load_db()
-    if not db:
-        return 1
-    return max(item.get('loanId', 0) for item in db) + 1
+    def get_status(self):
+        return self._status
 
-# ================================================
-# NOSSAS FUNÇÕES (GREEN)
-# ================================================
+    def set_return_date(self, return_date):
+        self._return_date = return_date
 
+    def set_status(self, status):
+        self._status = status
+
+    def to_dict(self):
+        return {
+            "loanId": self._loan_id,
+            "userId": self._user_id,
+            "bookId": self._book_id,
+            "loanDate": self._loan_date.isoformat(),
+            "dueDate": self._due_date.isoformat(),
+            "returnDate": self._return_date.isoformat() if self._return_date else None,
+            "status": self._status,
+            "fine": self._fine
+        }
+
+# Lista global de empréstimos (similar ao model.py)
+emprestimos = []
+next_loan_id = 1
+
+# Funções auxiliares
+def _calcular_due_date(data_emprestimo, tipo_usuario):
+    """
+    Calcula a data de devolução prevista com base no tipo de usuário.
+    """
+    if tipo_usuario == "professor":
+        return data_emprestimo + timedelta(days=30)
+    return data_emprestimo + timedelta(days=14)
+
+# Funções principais (similar ao model.py)
 def verificar_disponibilidade(book_id):
     """
-    Verifica a disponibilidade de um livro consultando o módulo de Catálogo. 
+    Verifica a disponibilidade de um livro.
     """
     livro = mock_catalogo.get_livro(book_id)
     if not livro:
         return {"erro": "Livro não encontrado"}
     return livro
 
-def _calcular_due_date(data_emprestimo, tipo_usuario):
+def adicionar_emprestimo(user_id, book_id):
     """
-    Calcula a data de devolução prevista com base no tipo de usuário.
-    Regras: aluno=14 dias, professor=30 dias, funcionario=14 dias.
+    Adiciona um novo empréstimo ao sistema.
     """
-    if tipo_usuario == "professor":
-        return data_emprestimo + timedelta(days=30)
+    global next_loan_id
     
-    # "aluno" e "funcionario" (e outros) caem na regra padrão de 14 dias
-    return data_emprestimo + timedelta(days=14)
-
-def registrar_emprestimo(user_id, book_id):
-    """
-    Registra um novo empréstimo, validando com os módulos de Usuário e Catálogo. 
-    """
-    # 1. Validações (Integração de Leitura)
+    # Validações
     usuario = mock_usuarios.get_usuario(user_id)
     if not usuario:
         return {"sucesso": False, "erro": "Usuário não encontrado"}
+        
     livro = mock_catalogo.get_livro(book_id)
     if not livro:
         return {"sucesso": False, "erro": "Livro não encontrado"}
+        
     if livro["status"] != "disponivel":
         return {"sucesso": False, "erro": "Livro indisponível"}
-    
-    # --- CAMINHO FELIZ ---
-    
-    # 2. Lógica de Negócio e Dados
+
+    # Criação do empréstimo
     agora = datetime.now()
-    data_devolucao_prevista = _calcular_due_date(agora, usuario["tipo"])
+    data_devolucao = _calcular_due_date(agora, usuario["tipo"])
     
-    novo_emprestimo = {
-        "loanId": _get_next_loan_id(),
-        "userId": user_id,
-        "bookId": book_id,
-        "loanDate": agora.isoformat(),
-        "dueDate": data_devolucao_prevista.isoformat(),
-        "returnDate": None,
-        "status": "ACTIVE",
-        "fine": 0.0
-    }
+    novo_emprestimo = Emprestimo(
+        user_id=user_id,
+        book_id=book_id,
+        loan_id=next_loan_id,
+        loan_date=agora,
+        due_date=data_devolucao
+    )
     
-    # 3. Persistência (Salva no nosso JSON)
-    db = _load_db()
-    db.append(novo_emprestimo)
-    _save_db(db)
+    emprestimos.append(novo_emprestimo)
+    next_loan_id += 1
     
-    # 4. Atualiza o Módulo de Catálogo (Integração de Escrita Equipe 3 -> 2)
+    # Atualiza status do livro
     mock_catalogo.update_status_livro(book_id, "emprestado")
     
-    return {"sucesso": True, "loan": novo_emprestimo}
-
+    return {"sucesso": True, "loan": novo_emprestimo.to_dict()}
 
 def registrar_devolucao(loan_id):
     """
-    Registra a devolução de um livro. 
+    Registra a devolução de um livro.
     """
-    db = _load_db()
-    
-    emprestimo_encontrado = None
-    index_emprestimo = -1
-    
-    for i, emp in enumerate(db):
-        if emp["loanId"] == loan_id:
-            emprestimo_encontrado = emp
-            index_emprestimo = i
+    emprestimo = None
+    for emp in emprestimos:
+        if emp.get_loan_id() == loan_id:
+            emprestimo = emp
             break
     
-    # 1. Valida Empréstimo
-    if not emprestimo_encontrado:
+    if not emprestimo:
         return {"sucesso": False, "erro": "Empréstimo não encontrado"}
-
-    # 2. Valida Status
-    if emprestimo_encontrado["status"] != "ACTIVE":
+        
+    if emprestimo.get_status() != "ACTIVE":
         return {"sucesso": False, "erro": "Empréstimo já devolvido"}
-
-    # --- CAMINHO FELIZ ---
     
-    # 3. Lógica de Negócio
+    # Atualiza o empréstimo
     agora = datetime.now()
-    emprestimo_encontrado["status"] = "RETURNED"
-    emprestimo_encontrado["returnDate"] = agora.isoformat()
+    emprestimo.set_return_date(agora)
+    emprestimo.set_status("RETURNED")
     
-    # (Lógica de multa 'fine' poderia ser adicionada aqui)
+    # Atualiza o status do livro
+    mock_catalogo.update_status_livro(emprestimo.get_book_id(), "disponivel")
     
-    # 4. Persistência
-    db[index_emprestimo] = emprestimo_encontrado
-    _save_db(db)
-    
-    # 5. Atualiza o Módulo de Catálogo (Integração de Escrita Equipe 3 -> 2)
-    mock_catalogo.update_status_livro(emprestimo_encontrado["bookId"], "disponivel")
+    return {"sucesso": True, "loan": emprestimo.to_dict()}
 
-    return {"sucesso": True, "loan": emprestimo_encontrado}
+def get_emprestimos():
+    """
+    Retorna lista de todos os empréstimos.
+    """
+    return [emp.to_dict() for emp in emprestimos]
+
+def get_emprestimo_by_id(loan_id):
+    """
+    Busca um empréstimo específico pelo ID.
+    """
+    for emp in emprestimos:
+        if emp.get_loan_id() == loan_id:
+            return emp.to_dict()
+    return None

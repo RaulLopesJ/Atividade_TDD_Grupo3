@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verificar Disponibilidade - Sistema de Biblioteca</title>
+    <style>
+        :root {
+            --color-primary: #006600;
+            --color-primary-hover: #004d00;
+            --color-background: #f0f2f5;
+            --color-text: #333333;
+            --border-radius: 8px;
+            --font-family: 'Inter', sans-serif;
+            --font-size-base: 16px;
+            --spacing: 16px;
+        }
+        
+        body {
+            margin: 0;
+            font-family: var(--font-family);
+            font-size: var(--font-size-base);
+            background-color: var(--color-background);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: var(--spacing);
+        }
+
+        .container {
+            background: #fff;
+            padding: calc(var(--spacing) * 2);
+            border-radius: var(--border-radius);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            max-width: 400px;
+            width: 100%;
+        }
+
+        h1 {
+            color: var(--color-text);
+            font-size: 1.5rem;
+            margin-bottom: var(--spacing);
+            text-align: center;
+        }
+
+        .form-group {
+            margin-bottom: var(--spacing);
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: var(--color-text);
+            font-weight: 500;
+        }
+
+        input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: var(--border-radius);
+            font-size: var(--font-size-base);
+            box-sizing: border-box;
+        }
+
+        .button-group {
+            display: flex;
+            gap: var(--spacing);
+            margin-top: calc(var(--spacing) * 2);
+        }
+
+        button {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-size: var(--font-size-base);
+            transition: background-color 0.2s;
+        }
+
+        .submit-btn {
+            background-color: var(--color-primary);
+            color: white;
+        }
+
+        .submit-btn:hover {
+            background-color: var(--color-primary-hover);
+        }
+
+        .cancel-btn {
+            background-color: #e2e8f0;
+            color: var(--color-text);
+        }
+
+        .cancel-btn:hover {
+            background-color: #cbd5e0;
+        }
+
+        <!--ESTILO_MENSAGEM-->
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Verificar Disponibilidade</h1>
+        
+        <form action="/verificar_disponibilidade" method="POST">
+            <div class="form-group">
+                <label for="bookId">ID do Livro:</label>
+                <input type="number" id="bookId" name="bookId" required>
+            </div>
+            
+            <div class="button-group">
+                <button type="submit" class="submit-btn">Verificar</button>
+                <a href="/" class="cancel-btn" style="text-decoration: none; text-align: center;">Voltar</a>
+            </div>
+        </form>
+
+        <!--MENSAGEM-->
+    </div>
+</body>
+</html>
