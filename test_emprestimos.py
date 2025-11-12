@@ -187,10 +187,9 @@ class TestEmprestimos(unittest.TestCase):
         self.assertFalse(res3["sucesso"])
         self.assertEqual(res3["erro"], "Livro não encontrado")
 
-if __name__ == '__main__':
-    unittest.main()
     # ================================================
-
+    # TESTES DE CONTRATO (MODELO)
+    # ================================================
     def test_contrato_calcular_due_date_aluno(self):
         data_base = datetime(2025, 10, 1, 10, 0, 0)
         data_esperada = data_base + timedelta(days=14)
@@ -206,20 +205,33 @@ if __name__ == '__main__':
     def test_contrato_registrar_emprestimo_atualiza_catalogo(self):
         status_antes = mock_catalogo.get_livro(3)["status"]
         self.assertEqual(status_antes, "disponivel")
-        modulo_emprestimo.registrar_emprestimo(user_id=1, book_id=3)
+        # Testa diretamente o modelo (contrato)
+        modulo_emprestimo.adicionar_emprestimo(user_id=1, book_id=3)
         status_depois = mock_catalogo.get_livro(3)["status"]
         self.assertEqual(status_depois, "emprestado")
-        
+
     def test_contrato_registrar_devolucao_atualiza_catalogo(self):
-        db_fake = [{"loanId": 102, "userId": 1, "bookId": 2, "status": "ACTIVE"}]
-        modulo_emprestimo._save_db(db_fake)
+        # Insere manualmente um empréstimo no modelo e garante que a devolução
+        # atualize o catálogo.
+        emp = modulo_emprestimo.Emprestimo(
+            user_id=1,
+            book_id=2,
+            loan_id=102,
+            loan_date=datetime.now(),
+            due_date=datetime.now() + timedelta(days=14)
+        )
+        modulo_emprestimo.emprestimos.append(emp)
+        modulo_emprestimo.next_loan_id = max(modulo_emprestimo.next_loan_id, 103)
+        # garante que o catálogo esteja consistente com o empréstimo
+        mock_catalogo.update_status_livro(2, "emprestado")
         self.assertEqual(mock_catalogo.get_livro(2)["status"], "emprestado")
         modulo_emprestimo.registrar_devolucao(loan_id=102)
         self.assertEqual(mock_catalogo.get_livro(2)["status"], "disponivel")
 
     def test_contrato_formato_datas_iso_8601(self):
-        modulo_emprestimo.registrar_emprestimo(user_id=1, book_id=1)
-        db = modulo_emprestimo._load_db()
+        # Gera um empréstimo via modelo e verifica o formato das datas retornadas
+        modulo_emprestimo.adicionar_emprestimo(user_id=1, book_id=1)
+        db = modulo_emprestimo.get_emprestimos()
         loan = db[0]
         try:
             datetime.fromisoformat(loan["loanDate"])
@@ -227,3 +239,7 @@ if __name__ == '__main__':
         except ValueError:
             self.fail("Datas não estão em formato ISO 8601 válido")
         self.assertIsNone(loan["returnDate"])
+
+
+if __name__ == '__main__':
+    unittest.main()
